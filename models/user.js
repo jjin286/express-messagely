@@ -3,6 +3,7 @@
 const { ConflictError, NotFoundError } = require('../expressError');
 const bcrypt = require('bcrypt');
 const { BCRYPT_WORK_FACTOR } = require('../config');
+const db = require("../db");
 
 /** User of the site. */
 
@@ -27,15 +28,15 @@ class User {
     const hashedPassword = await bcrypt.hash(password, BCRYPT_WORK_FACTOR);
 
     const newUser = await db.query(
-      `INSERT INTO users (username, password, first_name, last_name, phone)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO users (username, password, first_name, last_name, phone, join_at, last_login_at)
+       VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
        RETURNING username, password, first_name, last_name, phone`,
       [username, hashedPassword, first_name, last_name, phone]
     );
 
     const newUserData = newUser.rows[0];
-
-    return { newUserData };
+    
+    return  newUserData;
   }
 
   /** Authenticate: is username/password valid? Returns boolean. */
@@ -65,8 +66,7 @@ class User {
 
     await db.query(
       `UPDATE users
-        SET last_login_at
-        VALUES current_timestamp
+        SET last_login_at = current_timestamp
         WHERE username = $1`,
       [username]);
 
@@ -126,6 +126,40 @@ class User {
    */
 
   static async messagesFrom(username) {
+
+    const results = await db.query(
+      `SELECT password
+       FROM users
+       WHERE username = $1`,
+      [username]
+    );
+
+    if (!results.rows[0]) {
+      throw new NotFoundError(`Username ${username} doesn't exist.`);
+    }
+
+    const messageFromUserQuery = await db.query(
+      `SELECT id,
+       (users.username, users.first_name, users.last_name, users.phone) AS to_user,
+       body, sent_at, read_at
+       FROM messages
+       JOIN users
+       ON (messages.to_username = users.username)
+       WHERE from_username = $1`,
+       [username]
+    );
+    messageFromUserQuery.rows.forEach(function(message){
+      const toUser = message.to_user.slice(1, -1).split(',');
+
+      message.to_user = {
+        first_name: toUser[1],
+        last_name: toUser[2],
+        phone: toUser[3],
+        username: toUser[0]
+      }
+    })
+
+    return messageFromUserQuery.rows;
   }
 
   /** Return messages to this user.
@@ -137,6 +171,40 @@ class User {
    */
 
   static async messagesTo(username) {
+    const results = await db.query(
+      `SELECT password
+       FROM users
+       WHERE username = $1`,
+      [username]
+    );
+
+    if (!results.rows[0]) {
+      throw new NotFoundError(`Username ${username} doesn't exist.`);
+    }
+
+    const messageToUserQuery = await db.query(
+      `SELECT id,
+       (users.username, users.first_name, users.last_name, users.phone) AS from_user,
+       body, sent_at, read_at
+       FROM messages
+       JOIN users
+       ON (messages.from_username = users.username)
+       WHERE to_username = $1`,
+       [username]
+    );
+
+    messageToUserQuery.rows.forEach(function(message){
+      const fromUser = message.from_user.slice(1, -1).split(',');
+
+      message.from_user = {
+        first_name: fromUser[1],
+        last_name: fromUser[2],
+        phone: fromUser[3],
+        username: fromUser[0]
+      }
+    })
+
+    return messageToUserQuery.rows;
   }
 }
 
