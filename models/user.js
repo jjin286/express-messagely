@@ -14,29 +14,26 @@ class User {
    */
 
   static async register({ username, password, first_name, last_name, phone }) {
-    const existingUser = await db.query(
-      `SELECT username
-       FROM users
-       WHERE username ILIKE $1`,
-      [username]
-    );
 
-    if (existingUser.rows[0]) {
-      throw new ConflictError("Username already taken.");
+    if (await User.checkUserExists(username)) { // use strict equality to true rather than inherent truthy/falsiness
+      throw new ConflictError(`Username ${username} is taken.`);
     }
 
     const hashedPassword = await bcrypt.hash(password, BCRYPT_WORK_FACTOR);
 
     const newUser = await db.query(
-      `INSERT INTO users (username, password, first_name, last_name, phone, join_at, last_login_at)
-       VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
-       RETURNING username, password, first_name, last_name, phone`,
+      `INSERT INTO users
+        (username, password, first_name, last_name, phone, join_at, last_login_at)
+       VALUES
+        ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
+       RETURNING
+        username, password, first_name, last_name, phone`,
       [username, hashedPassword, first_name, last_name, phone]
     );
 
     const newUserData = newUser.rows[0];
-    
-    return  newUserData;
+
+    return newUserData;
   }
 
   /** Authenticate: is username/password valid? Returns boolean. */
@@ -56,7 +53,7 @@ class User {
 
     const userPassword = results.rows[0].password;
 
-    return await bcrypt.compare(password, userPassword);
+    return await bcrypt.compare(password, userPassword); // strict equality true
 
   }
 
@@ -64,10 +61,15 @@ class User {
 
   static async updateLoginTimestamp(username) {
 
-    await db.query(
+    if (await User.checkUserExists(username) === false) {
+      throw new NotFoundError(`Username ${username} doesn't exist.`);
+    }
+
+    const results = await db.query(
       `UPDATE users
         SET last_login_at = current_timestamp
-        WHERE username = $1`,
+        WHERE username= $1
+        RETURNING last_login_at`,
       [username]);
 
   }
@@ -96,25 +98,18 @@ class User {
 
   static async get(username) {
 
-    const results = await db.query(
-      `SELECT password
-       FROM users
-       WHERE username = $1`,
-      [username]
-    );
-
-    if (!results.rows[0]) {
-      throw new NotFoundError(`Username ${username} doesn't exist.`);
-    }
-
-    const userQuery = await db.query(
+    const userResults = await db.query(
       `SELECT username, first_name, last_name, phone, join_at, last_login_at
       FROM users
       WHERE username = $1`,
       [username]
     );
 
-    return userQuery.rows[0];
+    if (!userResults.rows[0]) {
+      throw new NotFoundError(`Username ${username} doesn't exist.`);
+    }
+
+    return userResults.rows[0];
   }
 
   /** Return messages from this user.
@@ -127,37 +122,33 @@ class User {
 
   static async messagesFrom(username) {
 
-    const results = await db.query(
-      `SELECT password
-       FROM users
-       WHERE username = $1`,
-      [username]
-    );
-
-    if (!results.rows[0]) {
+    if (! await User.checkUserExists(username)) {
       throw new NotFoundError(`Username ${username} doesn't exist.`);
     }
 
     const messageFromUserQuery = await db.query(
       `SELECT id,
-       (users.username, users.first_name, users.last_name, users.phone) AS to_user,
+       users.username, users.first_name, users.last_name, users.phone,
        body, sent_at, read_at
        FROM messages
        JOIN users
        ON (messages.to_username = users.username)
        WHERE from_username = $1`,
-       [username]
+      [username]
     );
-    messageFromUserQuery.rows.forEach(function(message){
-      const toUser = message.to_user.slice(1, -1).split(',');
 
+    // TODO: map instead here
+    console.log(messageFromUserQuery.rows);
+    messageFromUserQuery.rows.forEach(function (message) {
+      //const toUser = message.to_user.slice(1, -1).split(',');
+      const {first_name,last_name,phone,username} = message;
       message.to_user = {
-        first_name: toUser[1],
-        last_name: toUser[2],
-        phone: toUser[3],
-        username: toUser[0]
-      }
-    })
+        first_name,
+        last_name,
+        phone,
+        username
+      };
+    });
 
     return messageFromUserQuery.rows;
   }
@@ -171,14 +162,9 @@ class User {
    */
 
   static async messagesTo(username) {
-    const results = await db.query(
-      `SELECT password
-       FROM users
-       WHERE username = $1`,
-      [username]
-    );
 
-    if (!results.rows[0]) {
+
+    if (! await User.checkUserExists(username)) {
       throw new NotFoundError(`Username ${username} doesn't exist.`);
     }
 
@@ -190,10 +176,10 @@ class User {
        JOIN users
        ON (messages.from_username = users.username)
        WHERE to_username = $1`,
-       [username]
+      [username]
     );
 
-    messageToUserQuery.rows.forEach(function(message){
+    messageToUserQuery.rows.forEach(function (message) {
       const fromUser = message.from_user.slice(1, -1).split(',');
 
       message.from_user = {
@@ -201,11 +187,31 @@ class User {
         last_name: fromUser[2],
         phone: fromUser[3],
         username: fromUser[0]
-      }
-    })
+      };
+    });
 
     return messageToUserQuery.rows;
   }
+
+
+  /**
+   * Takes in a username as a string
+   * Checks if the DB has a user with that username
+   * Returns boolean of existence of username
+   */
+  static async checkUserExists(username) {
+
+    const results = await db.query(
+      `SELECT password
+       FROM users
+       WHERE username ILIKE $1`,
+      [username]
+    );
+
+
+    return (results.rows.length > 0);
+  }
+
 }
 
 
