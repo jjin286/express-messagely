@@ -15,7 +15,7 @@ class User {
 
   static async register({ username, password, first_name, last_name, phone }) {
 
-    if (await User.checkUserExists(username)) { // use strict equality to true rather than inherent truthy/falsiness
+    if ((await User.checkUserExists(username)) === true) {
       throw new ConflictError(`Username ${username} is taken.`);
     }
 
@@ -43,7 +43,7 @@ class User {
     const results = await db.query(
       `SELECT password
        FROM users
-       WHERE username = $1`,
+       WHERE username ILIKE $1`,
       [username]
     );
 
@@ -53,24 +53,23 @@ class User {
 
     const userPassword = results.rows[0].password;
 
-    return await bcrypt.compare(password, userPassword); // strict equality true
+    return (await bcrypt.compare(password, userPassword) === true);
 
   }
 
   /** Update last_login_at for user */
 
   static async updateLoginTimestamp(username) {
-
-    if (await User.checkUserExists(username) === false) {
-      throw new NotFoundError(`Username ${username} doesn't exist.`);
-    }
-
     const results = await db.query(
       `UPDATE users
         SET last_login_at = current_timestamp
-        WHERE username= $1
+        WHERE username ILIKE $1
         RETURNING last_login_at`,
       [username]);
+
+      if (!results.rows[0]) {
+        throw new NotFoundError(`Username ${username} doesn't exist.`);
+      }
 
   }
 
@@ -101,7 +100,7 @@ class User {
     const userResults = await db.query(
       `SELECT username, first_name, last_name, phone, join_at, last_login_at
       FROM users
-      WHERE username = $1`,
+      WHERE username ILIKE $1`,
       [username]
     );
 
@@ -122,7 +121,7 @@ class User {
 
   static async messagesFrom(username) {
 
-    if (! await User.checkUserExists(username)) {
+    if ((await User.checkUserExists(username)) === false) {
       throw new NotFoundError(`Username ${username} doesn't exist.`);
     }
 
@@ -133,24 +132,27 @@ class User {
        FROM messages
        JOIN users
        ON (messages.to_username = users.username)
-       WHERE from_username = $1`,
+       WHERE from_username ILIKE $1`,
       [username]
     );
 
-    // TODO: map instead here
-    console.log(messageFromUserQuery.rows);
-    messageFromUserQuery.rows.forEach(function (message) {
-      //const toUser = message.to_user.slice(1, -1).split(',');
-      const {first_name,last_name,phone,username} = message;
-      message.to_user = {
-        first_name,
-        last_name,
-        phone,
-        username
-      };
+    const messagesFromUser = messageFromUserQuery.rows.map(function (message) {
+      const {first_name,last_name,phone,username, id, body, sent_at, read_at} = message;
+      return {
+        id,
+        body,
+        sent_at,
+        read_at,
+        to_user : {
+          first_name,
+          last_name,
+          phone,
+          username
+        }
+      }
     });
 
-    return messageFromUserQuery.rows;
+    return messagesFromUser;
   }
 
   /** Return messages to this user.
@@ -164,7 +166,7 @@ class User {
   static async messagesTo(username) {
 
 
-    if (! await User.checkUserExists(username)) {
+    if ((await User.checkUserExists(username)) === false) {
       throw new NotFoundError(`Username ${username} doesn't exist.`);
     }
 
@@ -175,7 +177,7 @@ class User {
        FROM messages
        JOIN users
        ON (messages.from_username = users.username)
-       WHERE to_username = $1`,
+       WHERE to_username ILIKE $1`,
       [username]
     );
 
@@ -209,7 +211,7 @@ class User {
     );
 
 
-    return (results.rows.length > 0);
+    return Boolean(results.rows.length > 0);
   }
 
 }
