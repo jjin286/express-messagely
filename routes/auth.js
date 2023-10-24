@@ -10,10 +10,9 @@ const jwt = require('jsonwebtoken');
 
 /** POST /login: {username, password} => {token} */
 router.post('/login', async function(req, res){
+
   if(req.body === undefined) throw new BadRequestError();
-
   const {username, password} = req.body;
-
   const authenticated = await User.authenticate(username, password);
 
   if(authenticated === false){
@@ -31,10 +30,10 @@ router.post('/login', async function(req, res){
  * {username, password, first_name, last_name, phone} => {token}.
  */
 router.post('/register', async function(req, res){
+
   if(req.body === undefined) throw new BadRequestError();
 
   const newUser = await User.register(req.body);
-  //TODO: Only want username in token
   const payload = newUser.username;
   const token = jwt.sign(payload, SECRET_KEY);
 

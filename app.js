@@ -6,6 +6,8 @@
 const express = require("express");
 const cors = require("cors");
 const { authenticateJWT } = require("./middleware/auth");
+const nunjucks = require('nunjucks');
+const templates = require ("/templates");
 
 const { NotFoundError } = require("./expressError");
 const app = new express();
@@ -29,6 +31,10 @@ const messageRoutes = require("./routes/messages");
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/messages", messageRoutes);
+
+app.use("/", function(req,res) {
+  return res.render("login.html");
+})
 
 
 /** 404 handler: matches unmatched routes; raises NotFoundError. */

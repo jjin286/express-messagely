@@ -23,14 +23,14 @@ router.use(ensureLoggedIn);
 router.get("/:id", async function (req, res) {
 
   const message = await Message.get(req.params.id);
-  // TODO: currentUser is already checked, no need for optional chaining
-  const currentUser = res.locals.user;
-  const hasUnauthorizedUsername =
-    currentUser?.username !== message.to_user.username &&
-    currentUser?.username !== message.from_user.username;
 
-  if (!currentUser || hasUnauthorizedUsername) {
-    // console.log("to", currentUser.)
+  const currentUsername = res.locals.user.username;
+
+  const hasUnauthorizedUsername =
+    currentUsername !== message.to_user.username &&
+    currentUsername !== message.from_user.username;
+
+  if (hasUnauthorizedUsername) {
     throw new UnauthorizedError("You are not authorized to view this message.");
   }
 
@@ -48,20 +48,17 @@ router.get("/:id", async function (req, res) {
 router.post("/", async function (req, res) {
 
   const { to_username, body } = req.body;
-  // TODO: consistent variable names, currentUsername
-  const currentUser = res.locals.user.username;
+  const currentUsername = res.locals.user.username;
 
-  console.log("from", currentUser, "to", to_username)
   const message = await Message.create(
     {
-      from_username: currentUser,
+      from_username: currentUsername,
       to_username,
       body
     });
 
     return res.status(201)
               .json({ message });
-
 
 });
 
@@ -78,13 +75,12 @@ router.post("/:id/read", async function (req, res) {
   const id = req.params.id;
 
   const messageDetails = await Message.get(id);
-  const to_username = messageDetails.to_user.username;
+  const toUsername = messageDetails.to_user.username;
 
-  const currentUser = res.locals.user;
-  const hasUnauthorizedUsername =
-    currentUser?.username !== to_username;
-// TODO: don't need to check current User
-  if (!currentUser || hasUnauthorizedUsername) {
+  const currentUsername = res.locals.user.username;
+  const hasUnauthorizedUsername = currentUsername !== toUsername;
+
+  if (hasUnauthorizedUsername) {
     throw new UnauthorizedError("You are not authorized to view this message.");
   }
 
