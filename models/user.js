@@ -43,7 +43,7 @@ class User {
     const results = await db.query(
       `SELECT password
        FROM users
-       WHERE username ILIKE $1`,
+       WHERE username = $1`,
       [username]
     );
 
@@ -63,7 +63,7 @@ class User {
     const results = await db.query(
       `UPDATE users
         SET last_login_at = current_timestamp
-        WHERE username ILIKE $1
+        WHERE username = $1
         RETURNING last_login_at`,
       [username]);
 
@@ -100,7 +100,7 @@ class User {
     const userResults = await db.query(
       `SELECT username, first_name, last_name, phone, join_at, last_login_at
       FROM users
-      WHERE username ILIKE $1`,
+      WHERE username = $1`,
       [username]
     );
 
@@ -132,7 +132,7 @@ class User {
        FROM messages
        JOIN users
        ON (messages.to_username = users.username)
-       WHERE from_username ILIKE $1`,
+       WHERE from_username = $1`,
       [username]
     );
 
@@ -177,7 +177,7 @@ class User {
        FROM messages
        JOIN users
        ON (messages.from_username = users.username)
-       WHERE to_username ILIKE $1`,
+       WHERE to_username = $1`,
       [username]
     );
 

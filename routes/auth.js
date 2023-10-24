@@ -34,8 +34,8 @@ router.post('/register', async function(req, res){
   if(req.body === undefined) throw new BadRequestError();
 
   const newUser = await User.register(req.body);
-
-  const payload = newUser;
+  //TODO: Only want username in token
+  const payload = newUser.username;
   const token = jwt.sign(payload, SECRET_KEY);
 
   return res.status(201).json({token});

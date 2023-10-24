@@ -4,6 +4,7 @@ const Router = require("express").Router;
 const router = new Router();
 const Message = require("../models/message");
 const { ensureLoggedIn } = require("../middleware/auth");
+const { UnauthorizedError } = require("../expressError");
 
 router.use(ensureLoggedIn);
 
@@ -22,13 +23,14 @@ router.use(ensureLoggedIn);
 router.get("/:id", async function (req, res) {
 
   const message = await Message.get(req.params.id);
-
+  // TODO: currentUser is already checked, no need for optional chaining
   const currentUser = res.locals.user;
   const hasUnauthorizedUsername =
-    currentUser?.username !== message.to_user.username ||
+    currentUser?.username !== message.to_user.username &&
     currentUser?.username !== message.from_user.username;
 
   if (!currentUser || hasUnauthorizedUsername) {
+    // console.log("to", currentUser.)
     throw new UnauthorizedError("You are not authorized to view this message.");
   }
 
@@ -46,8 +48,10 @@ router.get("/:id", async function (req, res) {
 router.post("/", async function (req, res) {
 
   const { to_username, body } = req.body;
-  const currentUser = res.locals.user;
+  // TODO: consistent variable names, currentUsername
+  const currentUser = res.locals.user.username;
 
+  console.log("from", currentUser, "to", to_username)
   const message = await Message.create(
     {
       from_username: currentUser,
@@ -79,7 +83,7 @@ router.post("/:id/read", async function (req, res) {
   const currentUser = res.locals.user;
   const hasUnauthorizedUsername =
     currentUser?.username !== to_username;
-
+// TODO: don't need to check current User
   if (!currentUser || hasUnauthorizedUsername) {
     throw new UnauthorizedError("You are not authorized to view this message.");
   }

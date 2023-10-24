@@ -5,7 +5,7 @@ const User = require('../models/user');
 
 const Router = require("express").Router;
 const router = new Router();
-
+// TODO: Choose one middleware to handle
 router.use(ensureLoggedIn);
 
 /** GET / - get list of users.
@@ -15,7 +15,7 @@ router.use(ensureLoggedIn);
  **/
 router.get('/', async function(req, res){
   const users = await User.all();
-  return { users };
+  return res.json({ users });
 })
 
 
@@ -27,7 +27,7 @@ router.get('/', async function(req, res){
 router.get('/:username', ensureCorrectUser, async function(req, res){
   const user = await User.get(req.params.username);
 
-  return { user };
+  return res.json({ user });
 })
 
 /** GET /:username/to - get messages to user
@@ -54,6 +54,7 @@ router.get('/:username/to', ensureCorrectUser, async function(req, res){
  *                 to_user: {username, first_name, last_name, phone}}, ...]}
  *
  **/
+// TODO: Provide auth descriptions
 router.get('/:username/from', ensureCorrectUser, async function(req, res){
   const messages = await User.messagesFrom(req.params.username);
 
