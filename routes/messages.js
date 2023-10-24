@@ -2,6 +2,10 @@
 
 const Router = require("express").Router;
 const router = new Router();
+const Message = require("../models/message");
+const { ensureLoggedIn } = require("../middleware/auth");
+
+router.use(ensureLoggedIn);
 
 /** GET /:id - get detail of message.
  *
@@ -15,6 +19,22 @@ const router = new Router();
  * Makes sure that the currently-logged-in users is either the to or from user.
  *
  **/
+router.get("/:id", async function (req, res) {
+
+  const message = await Message.get(req.params.id);
+
+  const currentUser = res.locals.user;
+  const hasUnauthorizedUsername =
+    currentUser?.username !== message.to_user.username ||
+    currentUser?.username !== message.from_user.username;
+
+  if (!currentUser || hasUnauthorizedUsername) {
+    throw new UnauthorizedError("You are not authorized to view this message.");
+  }
+
+  return res.json({ message });
+
+});
 
 
 /** POST / - post message.
@@ -23,6 +43,23 @@ const router = new Router();
  *   {message: {id, from_username, to_username, body, sent_at}}
  *
  **/
+router.post("/", async function (req, res) {
+
+  const { to_username, body } = req.body;
+  const currentUser = res.locals.user;
+
+  const message = await Message.create(
+    {
+      from_username: currentUser,
+      to_username,
+      body
+    });
+
+    return res.status(201)
+              .json({ message });
+
+
+});
 
 
 /** POST/:id/read - mark message as read:
@@ -32,6 +69,26 @@ const router = new Router();
  * Makes sure that the only the intended recipient can mark as read.
  *
  **/
+router.post("/:id/read", async function (req, res) {
+
+  const id = req.params.id;
+
+  const messageDetails = await Message.get(id);
+  const to_username = messageDetails.to_user.username;
+
+  const currentUser = res.locals.user;
+  const hasUnauthorizedUsername =
+    currentUser?.username !== to_username;
+
+  if (!currentUser || hasUnauthorizedUsername) {
+    throw new UnauthorizedError("You are not authorized to view this message.");
+  }
+
+  const message = await Message.markRead(id);
+
+  return res.json({ message });
+
+});
 
 
 module.exports = router;

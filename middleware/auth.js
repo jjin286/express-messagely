@@ -38,7 +38,7 @@ function ensureCorrectUser(req, res, next) {
 
 if (!currentUser || hasUnauthorizedUsername){
   throw new UnauthorizedError();
-} 
+}
 
   return next();
 }
