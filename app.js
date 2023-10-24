@@ -7,10 +7,14 @@ const express = require("express");
 const cors = require("cors");
 const { authenticateJWT } = require("./middleware/auth");
 const nunjucks = require('nunjucks');
-const templates = require ("/templates");
 
 const { NotFoundError } = require("./expressError");
 const app = new express();
+
+nunjucks.configure("templates", {
+  autoescape: true,
+  express: app,
+});
 
 // allow both form-encoded and json body parsing
 app.use(express.json());

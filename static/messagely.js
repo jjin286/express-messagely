@@ -1,6 +1,5 @@
 "use strict";
-
-const { response } = require("express");
+console.log("TRIGGERED SCRIPT")
 
 const $loginForm = $("#login-form");
 const $registerForm = $("#register-form");
@@ -20,7 +19,7 @@ async function userLogin() {
       },
       body : JSON.stringify({ username, password })
     });
-
+    console.log("user", username, "password", password)
     const data = await response.json();
     TOKEN = data._token;
 
